@@ -1,84 +1,66 @@
-const loginForm = document.getElementById("loginForm");
+const toggleLogin = document.getElementById("login");
+const toggleRegister = document.getElementById("register");
+const formLogin = document.getElementById("form-login");
+const formRegister = document.getElementById("form-register");
 
-loginForm.addEventListener("submit", loginUser);
 
-async function loginUser(event) {
+toggleLogin.addEventListener("click", () => {
+  toggleLogin.classList.add("active");
+  toggleRegister.classList.remove("active");
+  formLogin.classList.remove("d-none");
+  formRegister.classList.add("d-none");
+});
 
-    event.preventDefault();
+toggleRegister.addEventListener("click", () => {
+  toggleLogin.classList.remove("active");
+  toggleRegister.classList.add("active");
+  formLogin.classList.add("d-none");
+  formRegister.classList.remove("d-none");
+});
 
-    const username =
-        document.getElementById("username").value.trim();
 
-    const password =
-        document.getElementById("password").value.trim();
+const login = document.getElementById("form-login");
 
-    if (!username || !password) {
-        alert("Please enter Username and Password");
-        return;
+login.addEventListener("submit", async function loginUser(event) {
+  event.preventDefault();
+
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  if (!username || !password) {
+    alert("Please enter your username and password");
+    return;
+  }
+
+  try {
+    const response = await fetch("http://localhost:3000/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username,
+        password
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.message || "Login failed";
+      alert(errorMessage);
+      return;
     }
 
-    try {
-
-        const response = await fetch(
-            "http://localhost:3000/login",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    username,
-                    password
-                })
-            }
-        );
-
-        const data = await response.json();
-
-        if (!data.success) {
-            alert(data.message);
-            return;
-        }
-
-        localStorage.setItem(
-            "currentUser",
-            username
-        );
-
-        localStorage.setItem(
-            "role",
-            data.role
-        );
-
-        switch (data.role) {
-
-            case "ADMIN":
-                window.location.href =
-                    "admin-dashboard.html";
-                break;
-
-            case "DISPATCHER":
-                window.location.href =
-                    "dispatcher-dashboard.html";
-                break;
-
-            case "DRIVER":
-                window.location.href =
-                    "driver-dashboard.html";
-                break;
-
-            default:
-                alert("Unknown Role");
-        }
-
+    const data = await response.json();
+    if (data.success) {
+        window.location.href = data.redirect;
     }
-    catch (err) {
-
-        console.error(err);
-
-        alert(
-            "Unable to connect to server"
-        );
-
+    else {
+        alert(data.message);
     }
-}
+
+  } catch (error) {
+    console.error("Login error:", error);
+    alert("An error occurred while logging in. Please try again.");
+  }
+});

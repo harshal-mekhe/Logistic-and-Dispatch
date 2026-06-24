@@ -1,12 +1,12 @@
-const vehicleId = document.getElementById("vehicleId");
-const vehicleNumber = document.getElementById("vehicleNumber");
-const vehicleType = document.getElementById("vehicleType");
+const vehicleId = document.getElementById("vehicle-id");
+const vehicleNumber = document.getElementById("vehicle-number");
+const vehicleType = document.getElementById("vehicle-type");
 const capacity = document.getElementById("capacity");
 
 
 // FETCH VEHICLE
 
-document.getElementById("fetchBtn").addEventListener("click", async () => {
+document.getElementById("fetch-btn").addEventListener("click", async () => {
 
     const id = vehicleId.value.trim();
 
@@ -43,7 +43,7 @@ document.getElementById("fetchBtn").addEventListener("click", async () => {
 
 // ADD VEHICLE
 
-document.getElementById("saveBtn").addEventListener("click", async () => {
+document.getElementById("save-btn").addEventListener("click", async () => {
 
     try {
 
@@ -78,7 +78,7 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
 
 // UPDATE VEHICLE
 
-document.getElementById("updateBtn").addEventListener("click", async () => {
+document.getElementById("update-btn").addEventListener("click", async () => {
 
     const id = vehicleId.value.trim();
 
@@ -120,7 +120,7 @@ document.getElementById("updateBtn").addEventListener("click", async () => {
 
 // DELETE VEHICLE
 
-document.getElementById("deleteBtn").addEventListener("click", async () => {
+document.getElementById("delete-btn").addEventListener("click", async () => {
 
     const id = vehicleId.value.trim();
 
@@ -164,7 +164,7 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
 
 // CLEAR FORM
 
-document.getElementById("clearBtn")
+document.getElementById("clear-btn")
 .addEventListener("click", clearForm);
 
 function clearForm() {
