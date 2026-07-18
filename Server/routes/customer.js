@@ -157,14 +157,14 @@ router.post("/", async (req, res) => {
         connection = await getConnection();
 
         await connection.execute(
-            `INSERT INTO CUSTOMER(CUSTOMERNAME, ADDRESS, PHONE) VALUES (:1, :2, :3)`, 
+            `INSERT INTO CUSTOMER(CUSTOMERNAME, ADDRESS, PHONE) VALUES (:1, :2, :3)`,
             [customerName, customerAddress, customerPhone],
             { autoCommit: true }
         );
 
         res.json({ success: true, message: "Customer Added Successfully" });
 
-    } catch(err) {
+    } catch (err) {
         res.status(500).json({ success: false, message: "An error occurred during creation" });
     } finally {
         if (connection) {

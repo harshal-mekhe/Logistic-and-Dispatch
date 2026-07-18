@@ -1,11 +1,20 @@
 // import React from "react";
 
 const MainLanding = () => {
-  const getPath = (fileName) => {
-    if (window.location.port === "5173") {
-      return `http://localhost:3000/Web/${fileName}`;
+  const getPath = (path) => {
+    if (path.startsWith("#")) {
+      return path;
     }
-    return `/Web/${fileName}`;
+
+    if (path.startsWith("/")) {
+      return path;
+    }
+
+    if (window.location.port === "5173") {
+      return `http://localhost:3000/Web/${path}`;
+    }
+
+    return `/Web/${path}`;
   };
 
   const boardMatrix = [
@@ -70,7 +79,7 @@ const MainLanding = () => {
         {
           name: "Admin Dashboard",
           desc: "System overview & key metrics",
-          path: "admin-dashboard.html",
+          path: "/AdminDashboard",
         },
         {
           name: "Dispatcher Board",
@@ -161,7 +170,6 @@ const MainLanding = () => {
       <main className="w-full px-4 py-2">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 items-start">
           {boardMatrix.map((column, idx) => (
-            
             <section
               key={idx}
               className={`flex flex-col h-full min-h-[85vh] rounded-lg border bg-white shadow-sm overflow-hidden ${column.colorClass}`}
@@ -177,32 +185,32 @@ const MainLanding = () => {
                 </span>
               </div>
 
-
-              <div className={`flex-grow flex flex-col divide-y divide-slate-100 ${column.bgTint}`}>
-              {column.items.map((item, itemIdx) => {
-                
-                let bg = "bg-white"
-                if (itemIdx % 2 == 0) {
-                    bg = item.bgTint;
-                }
-                return (
-                  <a
-                    key={itemIdx}
-                    href={item.path.startsWith("#") ? item.path : getPath(item.path)}
-                    className={`group p-4 flex gap-3 ${bg} ${column.bgHover} no-underline transition-colors duration-200`}
-                  >
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-900">
-                        {item.name}
-                      </h4>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {item.desc}
-                      </p>
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
+              <div
+                className={`grow flex flex-col divide-y divide-slate-100 ${column.bgTint}`}
+              >
+                {column.items.map((item, itemIdx) => {
+                  let bg = "bg-white";
+                  if (itemIdx % 2 == 0) {
+                    bg = column.bgTint;
+                  }
+                  return (
+                    <a
+                      key={itemIdx}
+                      href={getPath(item.path)}
+                      className={`group p-4 flex gap-3 ${bg} ${column.bgHover} no-underline transition-colors duration-200`}
+                    >
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900">
+                          {item.name}
+                        </h4>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
             </section>
           ))}
         </div>
