@@ -1,4 +1,4 @@
-// import React from "react";
+import { Link } from "react-router-dom";
 
 const MainLanding = () => {
   const getPath = (path) => {
@@ -84,12 +84,12 @@ const MainLanding = () => {
         {
           name: "Dispatcher Board",
           desc: "Live order & assignment controls",
-          path: "dispatcher-dashboard.html",
+          path: "/DispatcherDashboard",
         },
         {
           name: "Driver Console",
           desc: "View assignments & update delivery status",
-          path: "driver-dashboard.html",
+          path: "/DriverDashboard",
         },
       ],
     },
@@ -190,15 +190,26 @@ const MainLanding = () => {
               >
                 {column.items.map((item, itemIdx) => {
                   let bg = "bg-white";
+
+                  const isReactRoute = item.path.startsWith("/");
+
                   if (itemIdx % 2 == 0) {
                     bg = column.bgTint;
                   }
-                  return (
-                    <a
-                      key={itemIdx}
-                      href={getPath(item.path)}
-                      className={`group p-4 flex gap-3 ${bg} ${column.bgHover} no-underline transition-colors duration-200`}
-                    >
+
+                  return isReactRoute ? (
+                    <Link key={itemIdx} to={item.path} className={`group p-4 flex gap-3 ${bg} ${column.bgHover} no-underline transition-colors duration-200`}>
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900">
+                          {item.name}
+                        </h4>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </Link>
+                  ) : (
+                    <a key={itemIdx} href={getPath(item.path)} className={`group p-4 flex gap-3 ${bg} ${column.bgHover} no-underline transition-colors duration-200`}>
                       <div>
                         <h4 className="font-bold text-sm text-slate-900">
                           {item.name}

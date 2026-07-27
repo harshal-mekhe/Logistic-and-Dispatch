@@ -23,6 +23,8 @@ function setFindMode(isFindMode) {
     if (!findMode) {
         toggleFormMode(false);
     }
+
+    loadOrderIds();
 }
 
 function toggleFormMode(isUpdateMode) {
@@ -52,7 +54,8 @@ function clearFields() {
 async function loadOrderIds() {
 
     try {
-        const response = await fetch(`${API_BASE_URL}/orders`);
+        const mode = findMode ? "FIND" : "NEW";
+        const response = await fetch(`${API_BASE_URL}/orders?mode=${mode}`);
 
         const data = await response.json();
 

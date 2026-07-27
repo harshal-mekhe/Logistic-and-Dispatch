@@ -29,6 +29,8 @@ app.use("/dispatch-assignment", require("./routes/DispatchAssignment"));
 
 app.use("/dispatch-order", require("./routes/dispatchOrder"));
 
+app.use("/admin-dashboard", require("./routes/AdminDashboard"));
+
 
 app.listen(3000, () => {
 

@@ -145,6 +145,34 @@ router.get("/:id", async (req, res) => {
 
 });
 
+router.get("/", async (req, res) => {
+    let connection;
+
+    try {
+        connection = await getConnection();
+
+        const result = await connection.execute(`SELECT CUSTOMERID, CUSTOMERNAME, PHONE, ADDRESS FROM CUSTOMER ORDER BY CUSTOMERID`);
+
+        const customers = result.rows.map(row => ({
+            customerId: row[0],
+            customerName: row[1],
+            customerPhone: row[2],
+            customerAddress: row[3]
+        }));
+
+        res.json(customers);
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to retrieve customer records" });
+    }
+    finally {
+        if (connection) {
+            await connection.close();
+        }
+    }
+});
+
 
 //save
 router.post("/", async (req, res) => {
