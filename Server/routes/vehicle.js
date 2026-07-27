@@ -3,33 +3,26 @@ const router = express.Router();
 const oracledb = require("oracledb");
 const getConnection = require("../db");
 
-// LOV
+//LOV Vechicle type 
 router.get("/types", async (req, res) => {
-
   let connection;
 
   try {
-
     connection = await getConnection();
 
     const result = await connection.execute(
-      `SELECT LOV_VALUE FROM LOV_MASTER
-       WHERE LOV_TYPE = 'VehicleType'
-         AND STATUS = 'ACTIVE'
-       ORDER BY LOV_VALUE`
+      `SELECT LOV_VALUE FROM LOV_MASTER WHERE LOV_TYPE = 'VehicleType'AND STATUS = 'ACTIVE'ORDER BY LOV_VALUE`,
     );
 
     const types = (result.rows || []).map((row) => row[0]);
 
     res.json(types);
-
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
       message: "Unable to fetch vehicle types",
     });
-
   } finally {
     if (connection) {
       await connection.close();
@@ -38,44 +31,69 @@ router.get("/types", async (req, res) => {
 });
 
 
-//next id
-router.get("/next-id", async (req, res) => {
-
+router.get("/", async (req, res) => {
   let connection;
 
   try {
-
     connection = await getConnection();
 
     const result = await connection.execute(
-      `SELECT NVL(MAX(VEHICLEID), 0) + 1 FROM VEHICLE`
+      `SELECT VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY
+       FROM VEHICLE
+       ORDER BY VEHICLEID`
+    );
+
+    const vehicles = result.rows.map((row) => ({
+      vehicleId: row[0],
+      vehicleNumber: row[1],
+      vehicleType: row[2],
+      capacity: row[3],
+    }));
+
+    res.json(vehicles);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Fetch Failed" });
+
+  } finally {
+    if (connection) {
+      await connection.close();
+    }
+  }
+});
+
+//next id
+router.get("/next-id", async (req, res) => {
+  let connection;
+
+  try {
+    connection = await getConnection();
+
+    const result = await connection.execute(
+      `SELECT NVL(MAX(VEHICLEID), 0) + 1 FROM VEHICLE`,
     );
 
     const nextId = result.rows && result.rows[0] ? result.rows[0][0] : 1;
     res.json({ nextId });
-
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
       message: "Unable to get next vehicle ID",
     });
-
   } finally {
     if (connection) {
       await connection.close();
     }
   }
-
 });
 
 //save
 router.post("/", async (req, res) => {
-
   let connection;
 
   try {
-
     const { vehicleId, vehicleNumber, vehicleType, capacity } = req.body;
 
     connection = await getConnection();
@@ -83,12 +101,10 @@ router.post("/", async (req, res) => {
     let result;
 
     if (vehicleId) {
-
       result = await connection.execute(
-        `INSERT INTO VEHICLE (VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY)
-         VALUES (:vehicleId, :vehicleNumber, :vehicleType, :capacity)`,
+        `INSERT INTO VEHICLE (VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY) VALUES (:vehicleId, :vehicleNumber, :vehicleType, :capacity)`,
         { vehicleId, vehicleNumber, vehicleType, capacity },
-        { autoCommit: true }
+        { autoCommit: true },
       );
 
       res.json({
@@ -110,7 +126,7 @@ router.post("/", async (req, res) => {
         capacity,
         vehicleId: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
       },
-      { autoCommit: true }
+      { autoCommit: true },
     );
 
     const createdId = result.outBinds.vehicleId[0];
@@ -120,44 +136,34 @@ router.post("/", async (req, res) => {
       message: "Vehicle created successfully.",
       vehicleId: createdId,
     });
-
   } catch (err) {
-
     console.error(err);
 
     res.status(500).json({
       success: false,
       message: "Insert Failed. Check Vehicle ID, number, and type.",
     });
-
   } finally {
     if (connection) {
       await connection.close();
     }
   }
-
 });
 
 // next-id
 router.get("/next/:id", async (req, res) => {
-
   let connection;
 
   try {
-
     connection = await getConnection();
 
     const result = await connection.execute(
-      `SELECT VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY
-       FROM VEHICLE
-       WHERE VEHICLEID = (
-         SELECT MIN(VEHICLEID) FROM VEHICLE WHERE VEHICLEID > :1
+      `SELECT VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY FROM VEHICLE WHERE VEHICLEID = (SELECT MIN(VEHICLEID) FROM VEHICLE WHERE VEHICLEID > :1
        )`,
-      [req.params.id]
+      [req.params.id],
     );
 
     if (!result.rows || result.rows.length === 0) {
-
       return res.status(404).json({
         success: false,
         message: "No more records found",
@@ -172,14 +178,12 @@ router.get("/next/:id", async (req, res) => {
       vehicleType: row[2],
       capacity: row[3],
     });
-
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
       message: "Fetch Failed",
     });
-
   } finally {
     if (connection) {
       await connection.close();
@@ -189,24 +193,17 @@ router.get("/next/:id", async (req, res) => {
 
 // prev-id
 router.get("/previous/:id", async (req, res) => {
-
   let connection;
 
   try {
-
     connection = await getConnection();
 
     const result = await connection.execute(
-      `SELECT VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY
-       FROM VEHICLE
-       WHERE VEHICLEID = (
-         SELECT MAX(VEHICLEID) FROM VEHICLE WHERE VEHICLEID < :1
-       )`,
-      [req.params.id]
+      `SELECT VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY FROM VEHICLE WHERE VEHICLEID = ( SELECT MAX(VEHICLEID) FROM VEHICLE WHERE VEHICLEID < :1 )`,
+      [req.params.id],
     );
 
     if (!result.rows || result.rows.length === 0) {
-
       return res.status(404).json({
         success: false,
         message: "No more records found",
@@ -221,14 +218,12 @@ router.get("/previous/:id", async (req, res) => {
       vehicleType: row[2],
       capacity: row[3],
     });
-
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
       message: "Fetch Failed",
     });
-
   } finally {
     if (connection) {
       await connection.close();
@@ -238,18 +233,14 @@ router.get("/previous/:id", async (req, res) => {
 
 // fetch id
 router.get("/:id", async (req, res) => {
-
   let connection;
 
   try {
-
     connection = await getConnection();
 
     const result = await connection.execute(
-      `SELECT VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY
-       FROM VEHICLE
-       WHERE VEHICLEID = :id`,
-      [req.params.id]
+      `SELECT VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY FROM VEHICLE WHERE VEHICLEID = :id`,
+      [req.params.id],
     );
 
     if (!result.rows || result.rows.length === 0) {
@@ -266,15 +257,12 @@ router.get("/:id", async (req, res) => {
       vehicleType: row[2],
       capacity: row[3],
     });
-
   } catch (err) {
-
     console.error(err);
 
     res.status(500).json({
       message: "Fetch Failed",
     });
-
   } finally {
     if (connection) {
       await connection.close();
@@ -282,14 +270,11 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-
 // update
 router.put("/:id", async (req, res) => {
-
   let connection;
 
   try {
-
     const { vehicleNumber, vehicleType, capacity } = req.body;
 
     connection = await getConnection();
@@ -301,7 +286,7 @@ router.put("/:id", async (req, res) => {
            CAPACITY      = :3
        WHERE VEHICLEID = :4`,
       [vehicleNumber, vehicleType, capacity, req.params.id],
-      { autoCommit: true }
+      { autoCommit: true },
     );
 
     if (result.rowsAffected === 0) {
@@ -315,14 +300,12 @@ router.put("/:id", async (req, res) => {
       success: true,
       message: "Vehicle updated successfully.",
     });
-
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
       message: "Update Failed",
     });
-
   } finally {
     if (connection) {
       await connection.close();
@@ -330,19 +313,14 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-
 router.get("/", async (req, res) => {
-
   let connection;
 
   try {
-
     connection = await getConnection();
 
     const result = await connection.execute(
-      `SELECT VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY
-       FROM VEHICLE
-       ORDER BY VEHICLEID`
+      `SELECT VEHICLEID, VEHICLENUMBER, VEHICLETYPE, CAPACITY FROM VEHICLE ORDER BY VEHICLEID`,
     );
 
     const vehicles = result.rows.map((row) => ({
@@ -353,15 +331,12 @@ router.get("/", async (req, res) => {
     }));
 
     res.json(vehicles);
-
   } catch (err) {
-
     console.error(err);
 
     res.status(500).json({
       message: "Fetch Failed",
     });
-
   } finally {
     if (connection) {
       await connection.close();

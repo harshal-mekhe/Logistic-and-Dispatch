@@ -4,16 +4,15 @@
   --accent:       #7f4ec9;
   --muted:        #6b7280;
 
-  /* Button colours — theme-matched */
-  --save-bg:      #16a34a;   /* emerald green */
+  --save-bg:      #16a34a;   
   --save-hover:   #15803d;
-  --update-bg:    #d97706;   /* amber */
+  --update-bg:    #d97706;   
   --update-hover: #b45309;
-  --prev-bg:      #4f46e5;   /* indigo */
+  --prev-bg:      #4f46e5;   
   --prev-hover:   #4338ca;
-  --next-bg:      #0891b2;   /* cyan */
+  --next-bg:      #0891b2;  
   --next-hover:   #0e7490;
-  --exit-bg:      #dc2626;   /* red */
+  --exit-bg:      #dc2626;   
   --exit-hover:   #b91c1c;
 }
 
@@ -22,7 +21,6 @@
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* center the whole page content */
 body {
   background: #cfe2ff;
   margin: 0;
@@ -196,9 +194,6 @@ body {
   display: none !important;
 }
 
-/* ════════════════════════════════════════════
-   BUTTONS  — styled properly with theme colors
-   ════════════════════════════════════════════ */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -267,14 +262,12 @@ body {
 }
 .btn-exit:hover { filter: brightness(1.08); }
 
-/* ── Button groups in the action bar ── */
 .btn-group-actions {
   display: inline-flex;
   gap: 12px;
   align-items: center;
 }
 
-/* Previous + Next are visually joined (pill pair) */
 .btn-group-nav {
   display: inline-flex;
   align-items: center;
@@ -300,7 +293,6 @@ body {
   line-height: 1;
 }
 
-/* ── Actions row ── */
 .actions {
   display: flex;
   justify-content: center;
@@ -316,7 +308,6 @@ body {
   align-items: center;
 }
 
-/* ── Sliding Find / New toggle ── */
 .mode-toggle {
   position: relative;
   display: inline-flex;
@@ -367,7 +358,6 @@ body {
   transform: translateX(var(--slider-shift, 88px));
 }
 
-/* Label text turns white when its radio is checked */
 .mode-toggle input#mode-find:checked + label {
   color: #fff;
 }

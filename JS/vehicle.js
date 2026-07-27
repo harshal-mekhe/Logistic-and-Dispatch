@@ -1,477 +1,593 @@
-const vehicleId = document.getElementById("vehicle-id");
-const vehicleNumber = document.getElementById("vehicle-number");
-const vehicleType = document.getElementById("vehicle-type");
-const capacity = document.getElementById("capacity");
-
-const actionBtn = document.getElementById("action-btn");
-const toggleFind = document.getElementById("toggle-find");
-const toggleNew = document.getElementById("toggle-new");
-const dbFeedback = document.getElementById("id-db-feedback");
-const nextBtn = document.getElementById("next-btn");
-
-const API_BASE_URL = "http://127.0.0.1:3000/vehicle";
-
-let activeMode = "FIND"; 
-let originalSnapshot = { vehicleNumber: "", vehicleType: "", capacity: "" };
-let idExistsInDB = false; 
-let isNavigating = false;
 
 
-function captureSnapshot() {
 
-    originalSnapshot = {
-        vehicleNumber: vehicleNumber.value.trim(),
-        vehicleType: vehicleType.value.trim(),
-        capacity: capacity.value.trim()
-    };
+const id = document.getElementById("vehicle-id");
+const num = document.getElementById("vehicle-number");
+const type = document.getElementById("vehicle-type");
+const cap = document.getElementById("capacity");
+const btnSave = document.getElementById("save-btn");
+const btnUpdate = document.getElementById("update-btn");
+const btnPrev = document.getElementById("previous-btn");
+const btnNext = document.getElementById("next-btn");
+const btnExit = document.getElementById("exit-btn");
+const radioFind = document.getElementById("mode-find");
+const radioNew = document.getElementById("mode-new");
+const toggle = document.getElementById("mode-toggle");
+const alert = document.getElementById("id-alert");
+
+//API Connection 
+const API_BASE = "http://127.0.0.1:3000";
+
+let recordId = null;
+let savedState = null;
+let dirty = false;
+let mode = "find";
+let sessionId = null;
+let navigating = false;
+
+
+function equals(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
-function dataIsMutated() {
 
-    return (
-        vehicleNumber.value.trim() !== originalSnapshot.vehicleNumber ||
-        vehicleType.value.trim() !== originalSnapshot.vehicleType ||
-        capacity.value.trim() !== originalSnapshot.capacity
-    );
+function getState() {
+  return {
+    vehicleNumber: num.value.trim(),
+    vehicleType: type.value.trim(),
+    capacity: cap.value.trim(),
+  };
 }
 
-// Keeping this function format as per requirements
-function isFormBlank() {
-
-    return !vehicleNumber.value.trim() && !vehicleType.value.trim() && !capacity.value.trim();
+//Check unsaved changes
+function checkDirty() {
+  if (!savedState) return false;
+  return !equals(getState(), savedState);
 }
 
+// Mark form clean
+function saveState(state) {
+  savedState = state || getState();
+  dirty = false;
+}
+
+//Show alert popup
+function showAlert(type, message) {
+  return Swal.fire({
+    position: "center",
+    icon: type,
+    title: message,
+    showConfirmButton: false,
+    timer: 1800,
+  });
+}
+
+// Show error inline
+function showError(message) {
+  if (!alert) return;
+  alert.textContent = message;
+  alert.style.display = "block";
+}
+
+// Hide error message
+function hideError() {
+  if (!alert) return;
+  alert.textContent = "";
+  alert.style.display = "none";
+}
+
+//save/update button
+function switchMode(isUpdate) {
+  if (isUpdate) {
+    btnSave.style.display = "none";
+    btnUpdate.style.display = "inline-flex";
+  } else {
+    btnSave.style.display = "inline-flex";
+    btnUpdate.style.display = "none";
+  }
+}
+
+// Clear input fields
 function clearFields() {
-
-    vehicleNumber.value = "";
-    vehicleType.value = "";
-    capacity.value = "";
+  num.value = "";
+  type.value = "";
+  cap.value = "";
 }
 
+// Adjust slider width
+function updateSlider() {
+  const labelFind = toggle.querySelector("label[for='mode-find']");
+  const labelNew = toggle.querySelector("label[for='mode-new']");
+  const slide = toggle.querySelector(".slider");
+  if (!labelFind || !labelNew || !slide) return;
 
-function resetInlineFeedback() {
-
-    dbFeedback.innerText = "";
-    dbFeedback.style.display = "none";
+  requestAnimationFrame(() => {
+    const wFind = labelFind.offsetWidth;
+    const wNew = labelNew.offsetWidth;
+    toggle.style.setProperty("--slider-shift", wFind + "px");
+    slide.style.width = (mode === "find" ? wFind : wNew) + "px";
+  });
 }
 
-function showToast(type, message) {
+// Switch to Find mode
+function switchFind() {
+  mode = "find";
+  radioFind.checked = true;
+  id.removeAttribute("placeholder");
+  id.readOnly = false;
+  id.classList.remove("id-locked");
+  updateSlider();
+}
 
-    return Swal.fire({
-        position: "center",
-        icon: type,
-        title: message,
-        showConfirmButton: false,
-        timer: 1800,
+// Switch to New mode
+function switchNew() {
+  mode = "new";
+  radioNew.checked = true;
+  id.placeholder = "Auto-assigned";
+  id.readOnly = true;
+  id.classList.add("id-locked");
+  updateSlider();
+}
+
+// Get vehicle by ID
+function getVehicle(vid) {
+  return fetch(`${API_BASE}/vehicle/${vid}`)
+    .then(res => res.ok ? res.json() : null)
+    .catch(() => null);
+}
+
+// Get next vehicle ID
+function getNextId() {
+  return fetch(`${API_BASE}/vehicle/next-id`)
+    .then(res => res.ok ? res.json() : null)
+    .then(data => data ? data.nextId : null)
+    .catch(() => null);
+}
+
+// Load vehicle types dropdown
+function loadTypes() {
+  type.disabled = true;
+  type.innerHTML = "<option value=''>Loading vehicle types...</option>";
+  
+  return fetch(`${API_BASE}/vehicle/types`)
+    .then(res => {
+      if (!res.ok) throw new Error("Load failed");
+      return res.json();
+    })
+    .then(types => {
+      type.innerHTML = "<option value=''>Select Vehicle Type</option>";
+      if (!Array.isArray(types) || types.length === 0) {
+        type.innerHTML = "<option value=''>No vehicle types configured</option>";
+        return;
+      }
+      types.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = opt.textContent = t;
+        type.appendChild(opt);
+      });
+    })
+    .catch(() => {
+      type.innerHTML = "<option value=''>Unable to load vehicle types</option>";
+    })
+    .finally(() => {
+      type.disabled = false;
     });
 }
 
-async function guardNavigation(callback) {
+//Fill form with record data
+function fillForm(record) {
+  recordId = record.vehicleId;
+  id.value = record.vehicleId;
+  num.value = record.vehicleNumber || "";
+  type.value = record.vehicleType || "";
+  cap.value = record.capacity || "";
+  switchMode(true);
+  saveState();
+  hideError();
+}
 
-    if (isNavigating) {
-        return;
+//Find vehicle by ID
+function search() {
+  const searchId = id.value.trim();
+  if (!searchId) {
+    showAlert("info", "Enter a Vehicle ID to search.");
+    return Promise.resolve();
+  }
+  
+  return getVehicle(searchId).then(record => {
+    if (!record) {
+      clearFields();
+      recordId = null;
+      switchMode(false);
+      showError(` Vehicle ID "${searchId}" does not exist.`);
+      return;
+    }
+    hideError();
+    fillForm(record);
+  });
+}
+
+//Create new vehicle record
+function addNew() {
+  return getNextId().then(nextId => {
+    if (!nextId) {
+      showAlert("error", "Unable to reserve a new Vehicle ID.");
+      return;
+    }
+    id.value = nextId;
+    sessionId = String(nextId);
+    clearFields();
+    recordId = null;
+    switchMode(false);
+    saveState(getState());
+    num.focus();
+  });
+}
+
+// Validate form data
+function validate() {
+  const number = num.value.trim();
+  const vtype = type.value.trim();
+  const capacity = cap.value.trim();
+  const regex = /^[A-Z0-9 \-]{3,15}$/i;
+
+  if (!number || !vtype) {
+    showAlert("error", "Please fill required fields: Vehicle Number and Type.");
+    return false;
+  }
+  if (!regex.test(number)) {
+    showAlert("error", "Vehicle Number must be 3–15 characters (letters, numbers, hyphen).");
+    return false;
+  }
+  if (capacity && (isNaN(capacity) || Number(capacity) <= 0)) {
+    showAlert("error", "Capacity must be a valid positive number if provided.");
+    return false;
+  }
+  return true;
+}
+
+//Check unsaved
+function checkNav(callback) {
+  if (navigating) return Promise.resolve();
+  if (!dirty) return callback();
+
+  navigating = true;
+  
+  return Swal.fire({
+    title: "Unsaved Changes",
+    text: "You have unsaved changes. What would you like to do?",
+    icon: "warning",
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: recordId ? "Update & Continue" : "Save & Continue",
+    denyButtonText: "Discard Changes",
+    cancelButtonText: "Stay Here",
+    reverseButtons: false,
+  }).then(result => {
+    if (result.isConfirmed) {
+      const savePromise = recordId ? update(true) : save();
+      return savePromise.then(ok => {
+        if (!ok) {
+          navigating = false;
+          return;
+        }
+        return callback();
+      });
+    } else if (result.isDenied) {
+      saveState();
+      dirty = false;
+      return callback();
+    }
+    navigating = false;
+  }).catch(() => {
+    navigating = false;
+  });
+}
+
+// Save new vehicle
+function save() {
+  if (!validate()) return Promise.resolve(false);
+
+  const payload = {
+    vehicleNumber: num.value.trim(),
+    vehicleType: type.value.trim(),
+    capacity: cap.value.trim(),
+  };
+  if (id.value.trim()) payload.vehicleId = Number(id.value.trim());
+
+  return fetch(`${API_BASE}/vehicle`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+    .then(res => res.json().then(data => ({ res, data })))
+    .then(({ res, data }) => {
+      if (!res.ok) {
+        showAlert("error", data.message || "Unable to save vehicle.");
+        return false;
+      }
+      const aId = data.vehicleId || id.value.trim();
+      return showAlert("success", `Vehicle ID ${aId} saved! Ready for next entry.`)
+        .then(() => addNew())
+        .then(() => true);
+    })
+    .catch(() => {
+      showAlert("error", "Unable to save vehicle.");
+      return false;
+    });
+}
+
+//Update vehicle
+function update(silent = false) {
+  const uid = id.value.trim();
+  if (!uid) {
+    showAlert("error", "Enter a valid Vehicle ID to update.");
+    return Promise.resolve(false);
+  }
+  if (!validate()) return Promise.resolve(false);
+
+  const current = getState();
+
+  if (savedState && equals(current, savedState)) {
+    showAlert("info", "No changes detected. Nothing was updated.");
+    saveState(current);
+    return Promise.resolve(true);
+  }
+
+  if (!silent) {
+    return Swal.fire({
+      title: "Confirm Update",
+      html: `Are you sure you want to update <b>Vehicle ID ${uid}</b>?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Yes, Update",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#d97706",
+      cancelButtonColor: "#6b7280",
+    }).then(confirm => {
+      if (!confirm.isConfirmed) return false;
+      return sendUpdate(uid, current);
+    });
+  }
+
+  return sendUpdate(uid, current);
+}
+
+//Send update
+function sendUpdate(uid, current) {
+  return fetch(`${API_BASE}/vehicle/${uid}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(current),
+  })
+    .then(res => res.json().then(data => ({ res, data })))
+    .then(({ res, data }) => {
+      if (!res.ok) {
+        showAlert("error", data.message || "Unable to update vehicle.");
+        return false;
+      }
+      recordId = Number(uid);
+      switchMode(true);
+      return Swal.fire({
+        position: "center",
+        icon: "success",
+        title: "Updated!",
+        text: data.message || `Vehicle ID ${uid} updated successfully.`,
+        showConfirmButton: false,
+        timer: 2000,
+      }).then(() => {
+        saveState(current);
+        return true;
+      });
+    })
+    .catch(() => {
+      showAlert("error", "Unable to update vehicle.");
+      return false;
+    });
+}
+[num, type, cap].forEach(el => {
+  el.addEventListener("input", () => {
+    dirty = checkDirty();
+  });
+});
+
+//Mode Find
+radioFind.addEventListener("change", () => {
+  if (!radioFind.checked) return;
+  checkNav(() => {
+    switchFind();
+    clearFields();
+    id.value = "";
+    recordId = null;
+    sessionId = null;
+    switchMode(false);
+    saveState(getState());
+    hideError();
+    updateSlider();
+    return Promise.resolve();
+  });
+});
+
+//Mode  New
+radioNew.addEventListener("change", () => {
+  if (!radioNew.checked) return;
+  checkNav(() => {
+    switchNew();
+    id.value = "";
+    sessionId = null;
+    hideError();
+    updateSlider();
+    return addNew();
+  });
+});
+
+let timer = null;
+
+id.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  if (mode === "find") {
+    clearTimeout(timer);
+    hideError();
+    checkNav(search);
+  } else {
+    num.focus();
+  }
+});
+
+//Type in ID field
+id.addEventListener("input", () => {
+  if (mode !== "find") return;
+  const sId = id.value.trim();
+  clearTimeout(timer);
+  hideError();
+  if (!sId) {
+    clearFields();
+    recordId = null;
+    switchMode(false);
+    saveState(getState());
+    return;
+  }
+  timer = setTimeout(() => {
+    if (recordId && String(recordId) === sId) return;
+    checkNav(search);
+  }, 400);
+});
+
+//Leave ID field
+id.addEventListener("blur", () => {
+  if (mode !== "find") return;
+  if (navigating) return;
+  const sId = id.value.trim();
+  if (!sId) return;
+  if (recordId && String(recordId) === sId) return;
+  clearTimeout(timer);
+  checkNav(search);
+});
+
+//Save 
+btnSave.addEventListener("click", () => {
+  save();
+});
+
+//Update 
+btnUpdate.addEventListener("click", () => {
+  update(false);
+});
+
+
+//Previous vehicle
+btnPrev.addEventListener("click", () => {
+  checkNav(() => {
+    const inId = id.value.trim();
+    const sId = inId || (recordId ? String(recordId) : null);
+
+    if (!sId) {
+      return Swal.fire({
+        icon: "info",
+        title: "No Record Loaded",
+        text: "Please load a vehicle record first before navigating.",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#4f46e5",
+      });
     }
 
-    if (!dataIsMutated()) {
-        await callback();
-        return;
-    }
-
-    isNavigating = true;
-
-    try {
-
-        const result = await Swal.fire({
-            title: "Unsaved Changes",
-            text: "You have unsaved changes on the form. How would you like to proceed?",
+    return fetch(`${API_BASE}/vehicle/previous/${sId}`)
+      .then(res => {
+        if (!res.ok) {
+          return Swal.fire({
             icon: "warning",
+            title: "Beginning of List",
+            html: `<p>You are already at the <b>first record</b>.<br>There is no previous data to show.</p>`,
+            confirmButtonText: "OK",
+            confirmButtonColor: "#4f46e5",
+            footer: `<small>Switch to <b>New</b> mode to add more records.</small>`,
+          });
+        }
+        return res.json().then(fillForm);
+      })
+      .catch(() => {
+        showAlert("error", "Unable to load previous vehicle.");
+      });
+  });
+});
+
+//Next id 
+btnNext.addEventListener("click", () => {
+  checkNav(() => {
+    const nextId = id.value.trim() || "0";
+
+    return fetch(`${API_BASE}/vehicle/next/${nextId}`)
+      .then(res => {
+        if (!res.ok) {
+          return Swal.fire({
+            icon: "warning",
+            title: "End of List",
+            html: `<p>You have reached the <b>last record</b>.<br>No more data to show.</p>
+                   <p style="margin-top:8px;">Would you like to add a new vehicle?</p>`,
             showCancelButton: true,
-            showDenyButton: true,
-            confirmButtonText: activeMode === "FIND" && idExistsInDB ? "Update & Continue" : "Save & Continue",
-            denyButtonText: "Discard Changes",
+            confirmButtonText: "Switch to New Mode",
             cancelButtonText: "Stay Here",
             confirmButtonColor: "#16a34a",
-            denyButtonColor: "#6b7280",
-            cancelButtonColor: "#5b2e8a",
-        });
-
-        if (result.isConfirmed) {
-            const success = await commitFormAction(true);
-
-            if (!success) {
-                return;
+            cancelButtonColor: "#6b7280",
+          }).then(result => {
+            if (result.isConfirmed) {
+              radioNew.checked = true;
+              switchNew();
+              id.value = "";
+              sessionId = null;
+              hideError();
+              updateSlider();
+              return addNew();
             }
-            await callback();
-
-        } else if (result.isDenied) {
-            captureSnapshot();
-            await callback();
+          });
         }
-
-    } finally {
-        isNavigating = false;
-    }
-}
-
-async function setFormMode(mode) {
-
-    activeMode = mode;
-
-    resetInlineFeedback();
-
-    if (mode === "NEW") {
-
-        toggleNew.classList.add("active");
-        toggleFind.classList.remove("active");
-        nextBtn.classList.add("d-none");
-
-        actionBtn.innerText = "Save";
-        actionBtn.className = "btn btn-success rounded-3 px-4 fw-bold";
-
-        vehicleId.disabled = true; 
-        clearFields();
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/new-id`);
-
-            if (response.ok) {
-                const data = await response.json();
-
-                vehicleId.value = data.nextId;
-            }
-
-        } catch (err) {
-            console.error("Error retrieving auto-increment sequences:", err);
-        }
-
-        idExistsInDB = false; 
-
-        captureSnapshot();
-
-    } else {
-
-        toggleFind.classList.add("active");
-        toggleNew.classList.remove("active");
-        nextBtn.classList.remove("d-none");
-
-        actionBtn.innerText = "Update";
-        actionBtn.className = "btn btn-warning rounded-3 px-4 fw-bold text-dark";
-
-        vehicleId.disabled = false;
-        vehicleId.value = "";
-        clearFields();
-
-        idExistsInDB = false;
-        captureSnapshot();
-    }
-}
-
-
-toggleFind.addEventListener("click", async () => {
-
-    if (activeMode === "FIND") {
-        return;
-    }
-    await guardNavigation(() => setFormMode("FIND"));
+        return res.json().then(fillForm);
+      })
+      .catch(() => {
+        showAlert("error", "Unable to load next vehicle.");
+      });
+  });
 });
 
-
-toggleNew.addEventListener("click", async () => {
-
-    if (activeMode === "NEW") {
-        return;
-    }
-    await guardNavigation(() => setFormMode("NEW"));
-});
-
-
-vehicleId.addEventListener("input", async () => {
-
-    if (activeMode === "NEW") {
-        return; 
-    }
-
-    const id = vehicleId.value.trim();
-
-    if (!id) {
-        clearFields();
-        captureSnapshot();
-        resetInlineFeedback();
-        idExistsInDB = false;
-
-        return;
-    }
-
-    try {
-
-        const response = await fetch(`${API_BASE_URL}/${id}`);
-
-        if (!response.ok) { 
-
-            clearFields(); 
-            captureSnapshot(); 
-            dbFeedback.innerText = `Vehicle ID "${id}" does not exist.`;
-            dbFeedback.style.display = "block";
-            idExistsInDB = false;
-
-            return; 
-        }
-
-        resetInlineFeedback();
-
-        const data = await response.json();
-
-        vehicleNumber.value = data.vehicleNumber || "";
-        vehicleType.value = data.vehicleType || "";
-        capacity.value = data.capacity || "";
-
-        idExistsInDB = true; 
-
-        captureSnapshot();
-
-    } catch (err) {
-        console.error(err);
-    }
-});
-
-
-async function commitFormAction(silent = false) {
-
-    const number = vehicleNumber.value.trim();
-    const type = vehicleType.value.trim();
-    const cap = capacity.value.trim();
-    const numRegex = /^[A-Z0-9 \-]{3,15}$/i;
-
-    if (!number || !type) {
-        Swal.fire({ icon: "error", title: "Missing Fields", text: "Please fill required fields: Vehicle Number and Type.", confirmButtonColor: "#5b2e8a" });
-
-        return false;
-    }
-
-    if (!numRegex.test(number)) {
-        Swal.fire({ icon: "error", title: "Invalid Format", text: "Vehicle Number must be 3–15 characters (letters, numbers, hyphen).", confirmButtonColor: "#5b2e8a" });
-
-        return false;
-    }
-
-    if (cap && (isNaN(cap) || Number(cap) <= 0)) {
-        Swal.fire({ icon: "error", title: "Invalid Input", text: "Capacity must be a valid positive number if provided.", confirmButtonColor: "#5b2e8a" });
-
-        return false;
-    }
-
-    if (activeMode === "FIND") {
-        const id = vehicleId.value.trim();
-
-        if (!id) {
-            Swal.fire({ icon: "error", title: "ID Missing", text: "Please enter or search for a valid Vehicle ID first.", confirmButtonColor: "#5b2e8a" });
-
-            return false;
-        }
-
-        try {
-            const checkResp = await fetch(`${API_BASE_URL}/${id}`);
-
-            if (!checkResp.ok) {
-                Swal.fire({ icon: "error", title: "Operation Denied", text: "Cannot update. This Vehicle ID does not exist in the system.", confirmButtonColor: "#5b2e8a" });
-
-                return false;
-            }
-
-        } catch(e) {
-            return false;
-        }
-
-        if (!dataIsMutated()) {
-            showToast("info", "No changes detected. Form matches database record.");
-
-            return true;
-        }
-
-
-        if (!silent) {
-            const confirmBox = await Swal.fire({
-                title: "Confirm Update",
-                html: `Are you sure you want to update the details for <b>Vehicle ID ${id}</b>?`,
-                icon: "question",
-                showCancelButton: true,
-                confirmButtonText: "Yes, Update",
-                cancelButtonText: "Cancel",
-                confirmButtonColor: "#d97706",
-                cancelButtonColor: "#6b7280"
-            });
-
-            if (!confirmBox.isConfirmed) {
-                return false;
-            }
-        }
-
-        try {
-
-            const response = await fetch(`${API_BASE_URL}/${id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    vehicleNumber: number,
-                    vehicleType: type,
-                    capacity: cap
-                })
-            });
-
-            const data = await response.json();
-
-            await Swal.fire({ position: "center", icon: "success", title: "Updated!", text: data.message || "Vehicle records modified successfully.", showConfirmButton: false, timer: 1800 });
-
-            captureSnapshot();
-
-            return true;
-
-        } catch (err) {
-            console.error(err);
-            return false;
-        }
-
-
-    } else {
-
-        try {
-
-            const response = await fetch(API_BASE_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    vehicleNumber: number,
-                    vehicleType: type,
-                    capacity: cap
-                })
-            });
-
-            const data = await response.json();
-
-            await showToast("success", data.message || "New vehicle registered successfully.");
-
-            clearFields();
-
-            await setFormMode("FIND");
-
-            return true;
-
-        } catch (err) {
-            console.error(err);
-            return false;
-        }
-    }
-}
-
-actionBtn.addEventListener("click", async () => {
-    await commitFormAction(false);
-});
-
-
-nextBtn.addEventListener("click", async () => {
-
-    await guardNavigation(async () => {
-
-        let id = vehicleId.value.trim();
-
-        if (!id) {
-            id = 0;
-        }
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/next/${id}`);
-
-            if (!response.ok) { 
-                await Swal.fire({ icon: "warning", title: "End of List", html: "<p>You have reached the <b>last entry</b>.<br>There are no subsequent records to display.</p>", confirmButtonText: "OK", confirmButtonColor: "#4f46e5" }); 
-                return; 
-            }
-
-            const data = await response.json();
-
-            await setFormMode("FIND"); 
-
-            vehicleId.value = data.vehicleId;
-            vehicleNumber.value = data.vehicleNumber || "";
-            vehicleType.value = data.vehicleType || "";
-            capacity.value = data.capacity || "";
-
-            idExistsInDB = true;
-
-            captureSnapshot();
-
-        } catch (err) {
-            console.error(err);
-        }
+//exit
+if (btnExit) {
+  btnExit.addEventListener("click", (e) => {
+    if (!dirty) return;
+    e.preventDefault();
+    Swal.fire({
+      title: "Unsaved Changes",
+      text: "You have unsaved changes. Leave without saving?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Leave",
+      cancelButtonText: "Stay",
+    }).then(res => {
+      if (res.isConfirmed) {
+        window.location = btnExit.href;
+      }
     });
-});
-
-
-document.getElementById("previous-btn").addEventListener("click", async () => {
-
-    let id = vehicleId.value.trim();
-
-    if (!id && activeMode === "FIND") {
-
-        await Swal.fire({ icon: "info", title: "No Record Loaded", text: "Please look up or load an active entry sequence first before navigating.", confirmButtonText: "OK", confirmButtonColor: "#4f46e5" });
-        return;
-    }
-
-    await guardNavigation(async () => {
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/previous/${id}`);
-
-            if (!response.ok) { 
-                await Swal.fire({ icon: "warning", title: "Beginning of List", html: "<p>You are already at the <b>first entry</b>.<br>There is no prior record to display.</p>", confirmButtonText: "OK", confirmButtonColor: "#4f46e5" }); 
-                return; 
-            }
-
-            const data = await response.json();
-
-            await setFormMode("FIND"); 
-
-            vehicleId.value = data.vehicleId;
-            vehicleNumber.value = data.vehicleNumber || "";
-            vehicleType.value = data.vehicleType || "";
-            capacity.value = data.capacity || "";
-
-            idExistsInDB = true;
-
-            captureSnapshot();
-
-        } catch (err) {
-            console.error(err);
-        }
-    });
-});
-
-
-async function loadVehicleTypes() {
-
-    vehicleType.disabled = true;
-    vehicleType.innerHTML = "<option value=''>Loading vehicle types...</option>";
-
-    try {
-        const res = await fetch(`${API_BASE_URL}/types`);
-
-        if (res.ok) {
-            const types = await res.json();
-            
-            vehicleType.innerHTML = "<option value=''>Select Vehicle Type</option>";
-            vehicleType.innerHTML += types.map(t => `<option value="${t}">${t}</option>`).join("");
-        }
-
-    } catch (err) {
-        console.error(err);
-        vehicleType.innerHTML = "<option value=''>Unable to load vehicle types</option>";
-    } finally {
-        vehicleType.disabled = false;
-    }
+  });
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
+//clear form 
+function clear() {
+  id.value = "";
+  clearFields();
+  recordId = null;
+  dirty = false;
+  switchMode(false);
+  savedState = getState();
+  hideError();
+}
 
-    await loadVehicleTypes();
-    
-    await setFormMode("FIND");
-});
+//Initialize page
+function initiliazepage() {
+  loadTypes().then(() => {
+    clear();
+    switchFind();
+    setTimeout(updateSlider, 50);
+  });
+}
+
+initiliazepage();

@@ -4,15 +4,20 @@ const getConnection = require("../db");
 
 // fetch orders
 router.get("/orders", async (req, res) => {
-
     let connection;
+    const mode = req.query.mode || "FIND";
 
     try {
         connection = await getConnection();
 
-        const result = await connection.execute(
-            `SELECT ORDERID FROM DISPATCHORDER ORDER BY ORDERID`
-        );
+        let query;
+        if (mode === "NEW") {
+            query = `SELECT ORDERID FROM DISPATCHORDER WHERE STATUS IN ('In Transit', 'In Progress') ORDER BY ORDERID`;
+        } else {
+            query = `SELECT ORDERID FROM DISPATCHORDER ORDER BY ORDERID`;
+        }
+
+        const result = await connection.execute(query);
 
         const orderIds = result.rows.map((row) => ({ ORDERID: row[0] }));
         res.json(orderIds);
@@ -28,28 +33,22 @@ router.get("/orders", async (req, res) => {
     }
 });
 
-
 //next id
 router.get("/next-id", async (req, res) => {
-
     let connection;
 
     try {
-
         connection = await getConnection();
 
         const result = await connection.execute(
-            `SELECT NVL(MAX(DELIVERYID), 0) + 1 AS NEXTID FROM DELIVERY`
+            `SELECT NVL(MAX(DELIVERYID), 0) + 1 AS NEXTID FROM DELIVERY`,
         );
 
         const nextId = result.rows[0][0];
         res.json({ nextDeliveryId: nextId });
-
     } catch (err) {
-
         console.error(err);
         res.status(500).json({ message: "Failed to calculate next delivery ID" });
-
     } finally {
         if (connection) {
             await connection.close();
@@ -59,20 +58,17 @@ router.get("/next-id", async (req, res) => {
 
 // get (fetch)
 router.get("/:id", async (req, res) => {
-
     let connection;
 
     try {
-
         connection = await getConnection();
 
         const result = await connection.execute(
             `SELECT DELIVERYID, ORDERID, DELIVERYDATE, REMARKS, PROOFOFDELIVERY
              FROM DELIVERY
              WHERE DELIVERYID = :1`,
-            [req.params.id]
+            [req.params.id],
         );
-
 
         if (!result.rows || result.rows.length === 0) {
             return res.status(404).json({ message: "Delivery not found" });
@@ -85,13 +81,40 @@ router.get("/:id", async (req, res) => {
             orderId: row[1],
             deliveryDate: row[2],
             remarks: row[3],
-            proofOfDelivery: row[4]
+            proofOfDelivery: row[4],
         });
-
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Failed to load delivery" });
+    } finally {
+        if (connection) {
+            await connection.close();
+        }
+    }
+});
 
+router.get("/", async (req, res) => {
+    let connection;
+
+    try {
+        connection = await getConnection();
+
+        const result = await connection.execute(
+            `SELECT DELIVERYID, ORDERID, DELIVERYDATE, REMARKS, PROOFOFDELIVERY FROM DELIVERY ORDER BY DELIVERYID`,
+        );
+
+        const deliveries = result.rows.map((row) => ({
+            deliveryId: row[0],
+            orderId: row[1],
+            deliveryDate: row[2],
+            remarks: row[3],
+            proofOfDelivery: row[4],
+        }));
+
+        res.json(deliveries);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to retreived records" });
     } finally {
         if (connection) {
             await connection.close();
@@ -101,21 +124,21 @@ router.get("/:id", async (req, res) => {
 
 //next-id
 router.get("/next/:id", async (req, res) => {
-
     let connection;
 
     try {
-
         connection = await getConnection();
 
         const result = await connection.execute(
             `SELECT DELIVERYID, ORDERID, DELIVERYDATE, REMARKS, PROOFOFDELIVERY FROM DELIVERY WHERE
              DELIVERYID = (SELECT MIN(DELIVERYID) FROM DELIVERY WHERE DELIVERYID > :1)`,
-            [req.params.id]
+            [req.params.id],
         );
 
         if (!result.rows || result.rows.length === 0) {
-            return res.status(404).json({ success: false, message: "No more records found" });
+            return res
+                .status(404)
+                .json({ success: false, message: "No more records found" });
         }
 
         const row = result.rows[0];
@@ -125,38 +148,35 @@ router.get("/next/:id", async (req, res) => {
             orderId: row[1],
             deliveryDate: row[2],
             remarks: row[3],
-            proofOfDelivery: row[4]
+            proofOfDelivery: row[4],
         });
-
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Record not found" });
-
     } finally {
         if (connection) {
             await connection.close();
         }
     }
-
 });
 
 //prev-id
 router.get("/previous/:id", async (req, res) => {
-
     let connection;
 
     try {
-
         connection = await getConnection();
 
         const result = await connection.execute(
             `SELECT DELIVERYID, ORDERID, DELIVERYDATE, REMARKS, PROOFOFDELIVERY FROM DELIVERY WHERE
              DELIVERYID = (SELECT MAX(DELIVERYID) FROM DELIVERY WHERE DELIVERYID < :1)`,
-            [req.params.id]
+            [req.params.id],
         );
 
         if (!result.rows || result.rows.length === 0) {
-            return res.status(404).json({ success: false, message: "No more records found" });
+            return res
+                .status(404)
+                .json({ success: false, message: "No more records found" });
         }
 
         const row = result.rows[0];
@@ -166,14 +186,11 @@ router.get("/previous/:id", async (req, res) => {
             orderId: row[1],
             deliveryDate: row[2],
             remarks: row[3],
-            proofOfDelivery: row[4]
+            proofOfDelivery: row[4],
         });
-
     } catch (err) {
-
         console.error(err);
         res.status(500).json({ message: "Record not found" });
-
     } finally {
         if (connection) {
             await connection.close();
@@ -181,85 +198,102 @@ router.get("/previous/:id", async (req, res) => {
     }
 });
 
-
 //save
 router.post("/", async (req, res) => {
-
     let connection;
 
     try {
-        const { deliveryId, orderId, deliveryDate, remarks, proofOfDelivery } = req.body;
+        const { deliveryId, orderId, deliveryDate, remarks, proofOfDelivery } =
+            req.body;
 
         connection = await getConnection();
 
         const nextIdResult = await connection.execute(
-            `SELECT NVL(MAX(DELIVERYID), 0) + 1 AS NEXTID FROM DELIVERY`
+            `SELECT NVL(MAX(DELIVERYID), 0) + 1 AS NEXTID FROM DELIVERY`,
         );
 
-        const effectiveDeliveryId = deliveryId && String(deliveryId).trim() !== ""
-            ? Number(deliveryId)
-            : nextIdResult.rows[0][0];
+        const effectiveDeliveryId =
+            deliveryId && String(deliveryId).trim() !== ""
+                ? Number(deliveryId)
+                : nextIdResult.rows[0][0];
 
-        const dateValue = deliveryDate && String(deliveryDate).trim() ? deliveryDate : null;
+        const dateValue =
+            deliveryDate && String(deliveryDate).trim() ? deliveryDate : null;
 
         let insertSQL;
 
         let params;
 
         if (dateValue) {
-
             insertSQL = `INSERT INTO DELIVERY(DELIVERYID, ORDERID, DELIVERYDATE, REMARKS, PROOFOFDELIVERY)
                          VALUES (:1, :2, TO_DATE(:3, 'YYYY-MM-DD'), :4, :5)`;
 
-            params = [effectiveDeliveryId, orderId, dateValue, remarks || null, proofOfDelivery || null];
-
+            params = [
+                effectiveDeliveryId,
+                orderId,
+                dateValue,
+                remarks || null,
+                proofOfDelivery || null,
+            ];
         } else {
-
             insertSQL = `INSERT INTO DELIVERY(DELIVERYID, ORDERID, DELIVERYDATE, REMARKS, PROOFOFDELIVERY)
                          VALUES (:1, :2, SYSDATE, :3, :4)`;
 
-            params = [effectiveDeliveryId, orderId, remarks || null, proofOfDelivery || null];
+            params = [
+                effectiveDeliveryId,
+                orderId,
+                remarks || null,
+                proofOfDelivery || null,
+            ];
         }
 
-        await connection.execute(insertSQL, params, { autoCommit: true });
+        await connection.execute(insertSQL, params);
+
+        await connection.execute(
+            `UPDATE DISPATCHORDER SET STATUS = 'Completed' WHERE ORDERID = :1`,
+            [orderId],
+        );
+
+        await connection.commit();
 
         res.json({
             success: true,
-            message: "Delivery Added"
+            message: "Delivery Added",
         });
-
     } catch (err) {
-
         console.error(err);
 
         res.status(500).json({
             success: false,
-            message: "Insert Failed"
+            message: "Insert Failed",
         });
-
     } finally {
         if (connection) {
             await connection.close();
         }
     }
-
 });
 
 //update
 router.put("/:id", async (req, res) => {
-
     let connection;
 
     try {
-
         const { orderId, deliveryDate, remarks, proofOfDelivery } = req.body;
 
         connection = await getConnection();
 
-        const dateValue = deliveryDate && String(deliveryDate).trim() ? deliveryDate : null;
+        const dateValue =
+            deliveryDate && String(deliveryDate).trim() ? deliveryDate : null;
 
         const params = dateValue
-            ? [orderId, dateValue, remarks || null, proofOfDelivery || null, req.params.id]
+            ? [
+                orderId,
+                dateValue,
+                remarks || null,
+                proofOfDelivery || null,
+                req.params.id,
+            ]
             : [orderId, remarks || null, proofOfDelivery || null, req.params.id];
 
         const updateSQL = dateValue
@@ -275,23 +309,24 @@ router.put("/:id", async (req, res) => {
                    PROOFOFDELIVERY = :3
                WHERE DELIVERYID = :4`;
 
-        const result = await connection.execute(updateSQL, params, { autoCommit: true });
+        const result = await connection.execute(updateSQL, params, {
+            autoCommit: true,
+        });
 
         if (result.rowsAffected === 0) {
-            return res.status(404).json({ success: false, message: "Delivery not found" });
+            return res
+                .status(404)
+                .json({ success: false, message: "Delivery not found" });
         }
 
         res.json({
             success: true,
-            message: "Delivery Updated"
+            message: "Delivery Updated",
         });
-
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Update Failed" });
-
     } finally {
-
         if (connection) {
             await connection.close();
         }

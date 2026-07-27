@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const getConnection = require("../db");
+const { driverName } = require("oracledb");
 
 //new id
 router.get("/new-id", async (req, res) => {
@@ -148,6 +149,39 @@ router.get("/:id", async (req, res) => {
 
 });
 
+// Fetch all customer records for the dashboard explorer
+router.get("/", async (req, res) => {
+    let connection;
+
+    try {
+        connection = await getConnection();
+
+        const result = await connection.execute(
+            `SELECT DRIVERID, DRIVERNAME, PHONE, LICENSENUMBER
+             FROM DRIVER 
+             ORDER BY DRIVERID`
+        );
+
+  
+        const drivers = result.rows.map(row => ({
+            driverId: row[0],
+            driverName: row[1],
+            driverPhone: row[2],
+            licenseNumber: row[3]
+        }));
+
+        res.json(drivers);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to retrieve driver records" });
+
+    } finally {
+        if (connection) {
+            await connection.close();
+        }
+    }
+});
 
 //save
 router.post("/", async (req, res) => {

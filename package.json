@@ -14,6 +14,10 @@
     "body-parser": "^2.3.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "nodeman": "^1.1.2",
     "oracledb": "^7.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }

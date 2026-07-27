@@ -13,15 +13,18 @@ router.get("/kpis", async (req, res) => {
 
         const result = await connection.execute(`
             SELECT
-                (SELECT COUNT(*) FROM DISPATCHORDER WHERE UPPER(STATUS) = 'PENDING')   AS PENDING_COUNT,
-                (SELECT COUNT(*) FROM DISPATCHORDER WHERE UPPER(STATUS) = 'DISPATCHED') AS TRANSIT_COUNT,
-                (SELECT COUNT(*) FROM DISPATCHORDER WHERE UPPER(STATUS) = 'DELIVERED')  AS DELIVERED_COUNT
+                (SELECT COUNT(*) FROM CUSTOMER) AS CUSTOMER_COUNT,
+                (SELECT COUNT(*) FROM VEHICLE) AS VEHICLE_COUNT,
+                (SELECT COUNT(*) FROM DRIVER)  AS DRIVER_COUNT,
+                (SELECT COUNT(*) FROM DISPATCHASSIGNMENT)  AS ASSIGNMENT_COUNT,
+                (SELECT COUNT(*) FROM DISPATCHORDER)  AS ORDERS_COUNT,
+                (SELECT COUNT(*) FROM DELIVERY)  AS DELIVERY_COUNT
             FROM DUAL
         `);
 
         const row = result.rows[0];
 
-        res.json({ pending: row[0], transit: row[1], completed: row[2] });
+        res.json({ customers: row[0], vehicles: row[1], drivers: row[2], assignments: row[3], orders: row[4], deliveries: row[5] });
 
     } catch (err) {
         console.error(err);
@@ -33,6 +36,142 @@ router.get("/kpis", async (req, res) => {
         }
     }
 });
+
+router.get("/kpis-orders", async (req, res) => {
+  let connection;
+
+  try {
+    connection = await getConnection();
+
+    const result = await connection.execute(`
+      SELECT
+        COUNT(CASE WHEN UPPER(STATUS) = 'PENDING' THEN 1 END)    AS PENDING_COUNT,
+        COUNT(CASE WHEN UPPER(STATUS) = 'IN TRANSIT' THEN 1 END) AS TRANSIT_COUNT,
+        COUNT(CASE WHEN UPPER(STATUS) = 'COMPLETED' THEN 1 END)  AS DELIVERED_COUNT
+      FROM DISPATCHORDER
+    `);
+
+    const row = result.rows[0];
+
+    // Returns: { pending: 12, transit: 5, completed: 28 }
+    res.json({
+      pending: row[0] || 0,
+      transit: row[1] || 0,
+      completed: row[2] || 0,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to compute dispatch KPIs" });
+  } finally {
+    if (connection) {
+      await connection.close();
+    }
+  }
+});
+
+router.get("/users", async (req, res) => {
+
+    let connection;
+
+    try {
+
+        connection = await getConnection();
+
+        const result = await connection.execute(`
+            SELECT USER_ID, USERNAME, PASSWORD, ROLE, STATUS FROM USERS
+        `);
+
+        const users = result.rows.map((row) => ({
+            userId: row[0],
+            userName: row[1],
+            password: row[2],
+            role: row[3],
+            status: row[4]
+        }))
+
+        res.json(users);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to compute dashboard KPIs" });
+
+    } finally {
+        if (connection) {
+            await connection.close();
+        }
+    }
+});
+
+router.get("/driver/:id", async (req, res) => {
+  let connection;
+
+  try {
+    connection = await getConnection();
+
+    const result = await connection.execute(
+      `SELECT 
+         A.ASSIGNMENTID, 
+         A.ORDERID, 
+         A.VEHICLEID, 
+         A.ASSIGNEDDATE, 
+         O.STATUS 
+       FROM DISPATCHASSIGNMENT A 
+       JOIN DISPATCHORDER O ON A.ORDERID = O.ORDERID 
+       WHERE A.DRIVERID = :1`,
+      [req.params.id]
+    );
+
+    const assignments = result.rows.map((row) => ({
+      assignmentId: row[0],
+      orderId: row[1],
+      vehicleId: row[2],
+      assignedDate: row[3],
+      status: row[4], 
+    }));
+
+    res.json(assignments);
+  } catch (err) {
+    console.error("Error fetching driver assignments:", err);
+    res.status(500).json({ message: "Failed to fetch driver assignments" });
+  } finally {
+    if (connection) {
+      await connection.close();
+    }
+  }
+});
+
+router.get("/kpis-driver/:id", async (req, res) => {
+  let connection;
+
+  try {
+    connection = await getConnection();
+
+    const result = await connection.execute(`
+      SELECT
+        COUNT(CASE WHEN UPPER(STATUS) = 'PENDING' THEN 1 END)    AS PENDING_COUNT,
+        COUNT(CASE WHEN UPPER(STATUS) = 'IN TRANSIT' THEN 1 END) AS TRANSIT_COUNT,
+        COUNT(CASE WHEN UPPER(STATUS) = 'COMPLETED' THEN 1 END)  AS DELIVERED_COUNT
+      FROM DISPATCHORDER O JOIN DISPATCHASSIGNMENT A ON O.ORDERID = A.ORDERID WHERE A.DRIVERID =:1
+    `,[req.params.id]);
+
+    const row = result.rows[0];
+
+    
+    res.json({
+      pending: row[0] || 0,
+      transit: row[1] || 0,
+      completed: row[2] || 0,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to compute dispatch KPIs" });
+  } finally {
+    if (connection) {
+      await connection.close();
+    }
+  }
+});
+
 
 
 router.get("/active-assignments", async (req, res) => {
